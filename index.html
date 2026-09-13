@@ -1133,7 +1133,69 @@ function renderTourDetail(items,kind){const v=S.selected;const labels={tour:'주
 async function selectTourItem(item,kind){S.selectedTour=item;const v=S.selected;if(Number.isFinite(item.lat)&&Number.isFinite(item.lon))S.map.setView([item.lat,item.lon],15);let extra='';if(kind==='pet'&&item.contentId){extra='<div class="loading">반려동물 상세조건 조회 중...</div>'}const body=`<div class="section"><h3>${esc(item.title)}</h3><div class="kv"><b>주소</b><span>${esc(item.address||'—')}</span><b>거리</b><span>${item.distanceM!=null?Math.round(item.distanceM)+'m':'—'}</span><b>콘텐츠ID</b><span>${esc(item.contentId||'—')}</span></div></div>${extra}<div class="section"><button id="backList" style="border:0;border-radius:8px;background:#eef5fb;padding:8px 10px">목록으로</button></div>`;setRight(rightShell(v,body,imgUrl(item.image,kind)));$('#backList')?.addEventListener('click',()=>renderTourDetail(kind==='pet'?S.petItems:S.tourItems,kind));if(kind==='pet'&&item.contentId){try{const j=await getJSON(`/api/pet/detail?contentId=${encodeURIComponent(item.contentId)}`);const d=j.item||{};const sec=`<div class="section"><h3>반려동물 동반 조건</h3><div class="kv"><b>동반 범위</b><span>${esc(d.acmpyTypeCd||'—')}</span><b>동반 가능</b><span>${esc(d.acmpyPsblCpam||'—')}</span><b>필수사항</b><span>${esc(d.acmpyNeedMtr||'—')}</span><b>기타 안내</b><span>${esc(d.etcAcmpyInfo||'—')}</span></div></div>`;$('.right-body .loading')?.replaceWith(Object.assign(document.createElement('div'),{innerHTML:sec}).firstElementChild)}catch(e){$('.right-body .loading')?.replaceWith(Object.assign(document.createElement('div'),{className:'note',textContent:'상세조건을 불러오지 못했습니다.'}))}}}
 async function firstNonEmpty(builder){let last=null;for(const ym of (CFG.ANALYSIS_MONTHS||['202509','202504'])){try{const j=await getJSON(builder(ym));last=j;const items=j.body?.items?.item;const arr=Array.isArray(items)?items:(items?[items]:[]);if(arr.length)return {j,arr,ym}}catch(e){last={error:e.message}}}return {j:last,arr:[],ym:null}}
 function analysisNav(){return `<div class="analysis-tabs">${[['demand','수요'],['diversity','다양성'],['strength','수요강도'],['hub','중심관광지'],['related','연관관광지'],['forecast','집중률예측']].map(([k,n])=>`<button data-analysis="${k}" class="${S.analysisTab===k?'active':''}">${n}</button>`).join('')}</div>`}
-async function loadAnalysis(tab=S.analysisTab){const v=S.selected;if(!v)return;S.analysisTab=tab;S.area=resolveArea(v);const a=S.area;if(!a){setRight(rightShell(v,`${analysisNav()}<div class="empty">이 어촌계의 관광공사 시군구 코드를 자동 매칭하지 못했습니다.<br><small>${esc(v.address||v.union||'주소 없음')}</small></div>`));bindAnalysis();return}setRight(rightShell(v,`${analysisNav()}<div class="loading">${esc(a.areaNm)} ${esc(a.signguNm)} 관광분석을 불러오는 중...</div>`));bindAnalysis();const base=`areaCd=${a.areaCd}&signguCd=${a.signguCd}`;try{let body='';if(tab==='demand'){const r1=await firstNonEmpty(ym=>`/api/kto/areaResourceDemand/areaTarSvcDemList?baseYm=${ym}&${base}&tarSvcDemIxCd=1112`);const r2=await firstNonEmpty(ym=>`/api/kto/areaResourceDemand/areaCulResDemList?baseYm=${ym}&${base}&culResDemIxCd=1201`);const x=r1.arr[0]||{},y=r2.arr[0]||{};body=cards([[x.tarSvcDemIxNm,x.tarSvcDemIxVal],[y.culResDemIxNm,y.culResDemIxVal]],`기준연월 ${r1.ym||r2.ym||'—'}`)}else if(tab==='diversity'){const rs=await Promise.all([firstNonEmpty(ym=>`/api/kto/areaDiversity/areaTouDivList?baseYm=${ym}&${base}&touDivIxCd=3101`),firstNonEmpty(ym=>`/api/kto/areaDiversity/areaExpDivList?baseYm=${ym}&${base}&expDivIxCd=3204`),firstNonEmpty(ym=>`/api/kto/areaDiversity/areaIntlDivList?baseYm=${ym}&${base}&intlDivIxCd=3303`)]);body=cards([[rs[0].arr[0]?.touDivIxNm,rs[0].arr[0]?.touDivIxVal],[rs[1].arr[0]?.expDivIxNm,rs[1].arr[0]?.expDivIxVal],[rs[2].arr[0]?.intlDivIxNm,rs[2].arr[0]?.intlDivIxVal]],'관광 다양성 지표') }else if(tab==='strength'){const rs=await Promise.all([firstNonEmpty(ym=>`/api/kto/areaDemandStrength/areaTarSjrnDsList?baseYm=${ym}&${base}&tarSjrnDsIxCd=2101`),firstNonEmpty(ym=>`/api/kto/areaDemandStrength/areaTarExpDsList?baseYm=${ym}&${base}&tarExpDsIxCd=2201`)]);body=cards([[rs[0].arr[0]?.tarSjrnDsIxNm,rs[0].arr[0]?.tarSjrnDsIxVal],[rs[1].arr[0]?.tarExpDsIxNm,rs[1].arr[0]?.tarExpDsIxVal]],'관광수요 강도 지표')}else if(tab==='hub'){const r=await firstNonEmpty(ym=>`/api/kto/localHub/areaBasedList1?baseYm=${ym}&${base}`);body=rankList(r.arr,'hubTatsNm','hubRank','중심 관광지')}else if(tab==='related'){const r=await firstNonEmpty(ym=>`/api/kto/relatedTour/areaBasedList1?baseYm=${ym}&${base}`);body=rankList(r.arr,'rlteTatsNm','rlteRank','연관 관광지')}else if(tab==='forecast'){let target=(S.selectedTour?.contentTypeId==='12')?S.selectedTour.title:null;if(!target){const j=await getJSON(`/api/tour/nearby?mapX=${v.lng}&mapY=${v.lat}&radius=${Number($('#radius').value||3000)}&numOfRows=10&contentTypeId=12`);target=j.items?.[0]?.title;S.selectedTour=j.items?.[0]||null}if(!target)body='<div class="empty">집중률 예측 대상 관광지를 찾지 못했습니다.</div>';else{const j=await getJSON(`/api/kto/concentration/tatsCnctrRatedList?${base}&tAtsNm=${encodeURIComponent(target)}`);let arr=j.body?.items?.item||[];if(!Array.isArray(arr))arr=arr?[arr]:[];body=`<div class="section"><h3>${esc(target)} 관광객 집중률 예측</h3>${arr.slice(0,30).map((x,i)=>`<div class="rank"><i>${i+1}</i><span>${esc(x.baseYmd||'')}</span><b>${esc(x.cnctrRate||'—')}</b></div>`).join('')||'<div class="empty">예측 데이터가 없습니다.</div>'}</div>`}}setRight(rightShell(v,`${analysisNav()}<div class="note">분석단위: ${esc(a.areaNm)} ${esc(a.signguNm)} · 어촌계 자체 지표와 구분하여 표시합니다.</div>${body}`));bindAnalysis()}catch(e){setRight(rightShell(v,`${analysisNav()}<div class="empty">분석 API 오류<br><small>${esc(e.message)}</small></div>`));bindAnalysis()}}
+async function loadAnalysis(tab=S.analysisTab){const v=S.selected;if(!v)return;S.analysisTab=tab;S.area=resolveArea(v);const a=S.area;if(!a){setRight(rightShell(v,`${analysisNav()}<div class="empty">이 어촌계의 관광공사 시군구 코드를 자동 매칭하지 못했습니다.<br><small>${esc(v.address||v.union||'주소 없음')}</small></div>`));bindAnalysis();return}setRight(rightShell(v,`${analysisNav()}<div class="loading">${esc(a.areaNm)} ${esc(a.signguNm)} 관광분석을 불러오는 중...</div>`));bindAnalysis();const base=`areaCd=${a.areaCd}&signguCd=${a.signguCd}`;try{let body='';if(tab==='demand'){const r1=await firstNonEmpty(ym=>`/api/kto/areaResourceDemand/areaTarSvcDemList?baseYm=${ym}&${base}&tarSvcDemIxCd=1112`);const r2=await firstNonEmpty(ym=>`/api/kto/areaResourceDemand/areaCulResDemList?baseYm=${ym}&${base}&culResDemIxCd=1201`);const x=r1.arr[0]||{},y=r2.arr[0]||{};body=cards([[x.tarSvcDemIxNm,x.tarSvcDemIxVal],[y.culResDemIxNm,y.culResDemIxVal]],`기준연월 ${r1.ym||r2.ym||'—'}`)}else if(tab==='diversity'){const rs=await Promise.all([firstNonEmpty(ym=>`/api/kto/areaDiversity/areaTouDivList?baseYm=${ym}&${base}&touDivIxCd=3101`),firstNonEmpty(ym=>`/api/kto/areaDiversity/areaExpDivList?baseYm=${ym}&${base}&expDivIxCd=3204`),firstNonEmpty(ym=>`/api/kto/areaDiversity/areaIntlDivList?baseYm=${ym}&${base}&intlDivIxCd=3303`)]);body=cards([[rs[0].arr[0]?.touDivIxNm,rs[0].arr[0]?.touDivIxVal],[rs[1].arr[0]?.expDivIxNm,rs[1].arr[0]?.expDivIxVal],[rs[2].arr[0]?.intlDivIxNm,rs[2].arr[0]?.intlDivIxVal]],'관광 다양성 지표') }else if(tab==='strength'){const rs=await Promise.all([firstNonEmpty(ym=>`/api/kto/areaDemandStrength/areaTarSjrnDsList?baseYm=${ym}&${base}&tarSjrnDsIxCd=2101`),firstNonEmpty(ym=>`/api/kto/areaDemandStrength/areaTarExpDsList?baseYm=${ym}&${base}&tarExpDsIxCd=2201`)]);body=cards([[rs[0].arr[0]?.tarSjrnDsIxNm,rs[0].arr[0]?.tarSjrnDsIxVal],[rs[1].arr[0]?.tarExpDsIxNm,rs[1].arr[0]?.tarExpDsIxVal]],'관광수요 강도 지표')}else if(tab==='hub'){const r=await firstNonEmpty(ym=>`/api/kto/localHub/areaBasedList1?baseYm=${ym}&${base}`);body=rankList(r.arr,'hubTatsNm','hubRank','중심 관광지')}else if(tab==='related'){const r=await firstNonEmpty(ym=>`/api/kto/relatedTour/areaBasedList1?baseYm=${ym}&${base}`);body=rankList(r.arr,'rlteTatsNm','rlteRank','연관 관광지')}else if(tab==='forecast'){
+  let target=(S.selectedTour?.contentTypeId==='12')?S.selectedTour.title:null;
+
+  if(!target){
+    const near=await getJSON(`/api/tour/nearby?mapX=${v.lng}&mapY=${v.lat}&radius=${Number($('#radius').value||3000)}&numOfRows=10&contentTypeId=12`);
+    target=near.items?.[0]?.title||null;
+    S.selectedTour=near.items?.[0]||null;
+  }
+
+  const toArray=j=>{
+    let arr=j?.body?.items?.item||[];
+    return Array.isArray(arr)?arr:(arr?[arr]:[]);
+  };
+
+  let arr=[];
+  let shownTarget=target;
+  let fallbackNote='';
+
+  // 1차: 현재 선택/인접 관광지명을 정확히 넣어 조회
+  if(target){
+    const exact=await getJSON(`/api/kto/concentration/tatsCnctrRatedList?${base}&numOfRows=30&pageNo=1&tAtsNm=${encodeURIComponent(target)}`);
+    arr=toArray(exact);
+  }
+
+  // 2차: 관광지명(tAtsNm)은 공식 명세상 선택값이므로,
+  // 정확한 이름 조회가 비면 시군구 전체 예측지원 관광지를 조회한다.
+  if(!arr.length){
+    const regional=await getJSON(`/api/kto/concentration/tatsCnctrRatedList?${base}&numOfRows=100&pageNo=1`);
+    const all=toArray(regional);
+
+    if(all.length){
+      const norm=s=>String(s||'').replace(/[\s·._()\-]/g,'').toLowerCase();
+      const names=[...new Set(all.map(x=>x.tAtsNm).filter(Boolean))];
+
+      // 현재 관광지명과 최대한 같은 예측지원 관광지를 우선 선택
+      let matched=null;
+      if(target){
+        const nt=norm(target);
+        matched=names.find(n=>norm(n)===nt)
+          || names.find(n=>norm(n).includes(nt)||nt.includes(norm(n)));
+      }
+      shownTarget=matched||names[0]||target||'예측지원 관광지';
+      arr=all.filter(x=>!shownTarget||x.tAtsNm===shownTarget);
+
+      if(target && shownTarget && norm(target)!==norm(shownTarget)){
+        fallbackNote=`<div class="note">선택한 ‘${esc(target)}’은 집중률 예측 데이터가 없어, 같은 시군구의 예측지원 관광지 ‘${esc(shownTarget)}’를 표시합니다.</div>`;
+      }
+    }
+  }
+
+  if(!arr.length){
+    body=`<div class="section">
+      <h3>관광객 집중률 예측</h3>
+      <div class="empty">${esc(a.areaNm)} ${esc(a.signguNm)}에는 현재 집중률 예측 제공 관광지가 없습니다.<br><small>이 기능은 관광공사 예측 데이터가 제공되는 관광지에 한해 표시됩니다.</small></div>
+    </div>`;
+  }else{
+    body=`<div class="section">
+      <h3>${esc(shownTarget||'관광지')} 관광객 집중률 예측</h3>
+      ${fallbackNote}
+      ${arr.slice(0,30).map((x,i)=>`<div class="rank"><i>${i+1}</i><span>${esc(x.baseYmd||'')}</span><b>${esc(x.cnctrRate||'—')}</b></div>`).join('')}
+    </div>`;
+  }
+}setRight(rightShell(v,`${analysisNav()}<div class="note">분석단위: ${esc(a.areaNm)} ${esc(a.signguNm)} · 어촌계 자체 지표와 구분하여 표시합니다.</div>${body}`));bindAnalysis()}catch(e){setRight(rightShell(v,`${analysisNav()}<div class="empty">분석 API 오류<br><small>${esc(e.message)}</small></div>`));bindAnalysis()}}
 function cards(rows,sub){return `<div class="section"><h3>관광분석 지표</h3>${rows.map(([n,v])=>`<div class="analysis-card"><b>${esc(n||'지표')}</b><strong>${esc(v??'—')}</strong><small>${esc(sub)}</small></div>`).join('')}</div>`}
 function rankList(arr,nameKey,rankKey,title){const seen=new Set(),list=[];for(const x of arr){const n=x[nameKey];if(!n||seen.has(n))continue;seen.add(n);list.push(x)}list.sort((a,b)=>Number(a[rankKey]||999)-Number(b[rankKey]||999));return `<div class="section"><h3>${title}</h3>${list.slice(0,15).map((x,i)=>`<div class="rank"><i>${esc(x[rankKey]||i+1)}</i><span>${esc(x[nameKey])}</span><small>${esc(x.rlteCtgryMclsNm||x.hubCtgryMclsNm||'')}</small></div>`).join('')||'<div class="empty">데이터가 없습니다.</div>'}</div>`}
 function bindAnalysis(){$$('[data-analysis]').forEach(b=>b.onclick=()=>loadAnalysis(b.dataset.analysis))}
