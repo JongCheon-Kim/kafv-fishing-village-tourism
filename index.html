@@ -7,6 +7,8 @@
 <title>어촌관광정보앱 · v2.0 RC</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
+<link rel="preload" as="image" href="./assets/splash.png">
+<link rel="preload" as="image" href="./assets/main-cover.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -639,12 +641,55 @@ button{cursor:pointer}
   box-shadow:0 4px 12px rgba(0,0,0,.30);
 }
 
+
+/* ===== PWA INTRO : splash -> cover -> existing app ===== */
+.app{position:relative}
+
+.pwa-intro{
+  position:absolute;
+  inset:0;
+  z-index:99999;
+  background:#eef8ff;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .28s ease, visibility .28s ease;
+}
+.pwa-intro.show{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+}
+.pwa-intro.hide{
+  opacity:0;
+  visibility:visible;
+  pointer-events:none;
+}
+.pwa-intro img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  object-position:center center;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+@media (prefers-reduced-motion:reduce){
+  .pwa-intro{transition:none}
+}
+
 </style>
 
 </head>
 
 <body>
 <div class="app">
+<div id="pwaSplash" class="pwa-intro show" aria-label="어촌관광정보앱 스플래시">
+  <img src="./assets/splash.png" alt="어촌관광정보앱 스플래시">
+</div>
+<div id="pwaCover" class="pwa-intro" aria-label="어촌관광정보앱 대문">
+  <img src="./assets/main-cover.png" alt="어촌관광정보앱 대문">
+</div>
 <header class="top">
   <div class="brand">
     <div class="logo">⚓</div>
@@ -1423,7 +1468,58 @@ $('#locBtn')?.addEventListener('click',()=>{
   if(!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(p=>S.map.setView([p.coords.latitude,p.coords.longitude],13),()=>{});
 });
+
+function runPwaIntro(){
+  const splash=document.getElementById('pwaSplash');
+  const cover=document.getElementById('pwaCover');
+  if(!splash||!cover)return;
+
+  let stage='splash';
+  let splashTimer;
+  let coverTimer;
+
+  const endIntro=()=>{
+    if(stage==='done')return;
+    stage='done';
+    clearTimeout(splashTimer);
+    clearTimeout(coverTimer);
+    cover.classList.add('hide');
+    cover.classList.remove('show');
+    setTimeout(()=>{
+      splash?.remove();
+      cover?.remove();
+    },320);
+  };
+
+  const showCover=()=>{
+    if(stage!=='splash')return;
+    stage='cover';
+    clearTimeout(splashTimer);
+
+    splash.classList.add('hide');
+    splash.classList.remove('show');
+    cover.classList.add('show');
+
+    setTimeout(()=>splash?.remove(),320);
+
+    // 대문은 스플래시보다 길게 표시
+    coverTimer=setTimeout(endIntro,2800);
+  };
+
+  // 스플래시는 짧게: 약 1.3초
+  splashTimer=setTimeout(showCover,1300);
+
+  // 사용자가 터치/클릭하면 즉시 다음 단계로 이동
+  splash.addEventListener('click',showCover,{once:true});
+  cover.addEventListener('click',endIntro,{once:true});
+
+  // 이미지가 없거나 로딩 실패하면 앱 사용을 막지 않는다.
+  splash.querySelector('img')?.addEventListener('error',showCover,{once:true});
+  cover.querySelector('img')?.addEventListener('error',endIntro,{once:true});
+}
+
 init();
+runPwaIntro();
 if(location.protocol!=='file:'&&'serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
 </body></html>
