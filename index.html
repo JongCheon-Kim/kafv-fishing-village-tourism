@@ -1,0 +1,1429 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b5ea8">
+<title>어촌관광정보앱 · v2.0 RC</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
+
+<style>
+:root{
+  --blue:#075fab;--blue2:#1677cc;--sky:#eaf5ff;--ink:#14202b;--muted:#6c7b88;
+  --line:#dbe4eb;--bg:#eef4f8;--food:#f28b35;--stay:#7c55b7;--exp:#2aa86f;
+  --pet:#e04d82;--analysis:#4d68a8;--shadow:0 12px 36px rgba(20,51,79,.16);
+  --safe-bottom:env(safe-area-inset-bottom,0px)
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;color:var(--ink);background:var(--bg)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{
+  height:100dvh;min-height:100vh;display:grid;
+  grid-template-rows:64px 48px 46px 1fr;overflow:hidden;background:#fff
+}
+.top{
+  display:grid;grid-template-columns:auto minmax(180px,760px) auto;align-items:center;gap:12px;
+  padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);z-index:1500
+}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.logo{
+  width:42px;height:42px;border-radius:12px;background:linear-gradient(150deg,#0b69b6,#58b9e8);
+  display:grid;place-items:center;color:#fff;font-size:22px;box-shadow:0 5px 16px rgba(7,95,171,.22);flex:none
+}
+.brand b{display:block;font-size:19px;color:#0f4f86;letter-spacing:-.8px;white-space:nowrap}
+.brand small{display:block;color:var(--muted);font-size:10px;margin-top:1px;white-space:nowrap}
+.global-search{position:relative;min-width:0}
+.global-search input{
+  width:100%;height:42px;border:1px solid #cddae4;border-radius:12px;padding:0 50px 0 14px;
+  outline:none;background:#fff
+}
+.global-search input:focus{border-color:#78aee0;box-shadow:0 0 0 3px rgba(7,95,171,.08)}
+
+.global-search{z-index:1700}
+.search-suggest{
+  position:absolute;left:0;right:0;top:46px;display:none;
+  max-height:360px;overflow:auto;background:#fff;
+  border:1px solid #cfdce6;border-radius:12px;
+  box-shadow:0 16px 38px rgba(19,52,80,.20);
+  padding:6px;z-index:1950
+}
+.search-suggest.open{display:block}
+.suggest-row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+  width:100%;border:0;background:#fff;text-align:left;padding:9px 10px;
+  border-radius:9px;color:#19344b
+}
+.suggest-row:hover,.suggest-row.active{background:#eef7ff}
+.suggest-main{min-width:0}
+.suggest-main b{
+  display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.suggest-main small{
+  display:block;margin-top:2px;color:#71808c;font-size:10px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.suggest-tag{
+  font-size:9px;color:#0a61aa;background:#eaf4ff;border-radius:999px;
+  padding:4px 7px;white-space:nowrap
+}
+.suggest-empty{padding:14px;text-align:center;font-size:11px;color:#71808c}
+
+#searchBtn{
+  position:absolute;right:4px;top:4px;width:36px;height:34px;border:0;border-radius:9px;background:var(--blue);color:#fff
+}
+.top-actions{display:flex;gap:4px}
+.top-actions button{border:0;background:#fff;border-radius:9px;padding:8px;color:#37556e}
+.featurebar{
+  display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:5px 8px;
+  background:#fff;border-bottom:1px solid var(--line);z-index:1400
+}
+.featurebar::-webkit-scrollbar{display:none}
+.feature{
+  flex:1 0 118px;min-width:118px;border:0;border-radius:10px;color:#fff;font-weight:800;padding:9px 10px;
+  box-shadow:inset 0 -1px rgba(0,0,0,.08);white-space:nowrap
+}
+.feature[data-mode="village"]{background:#1266b0}
+.feature[data-mode="tour"]{background:#10a9c0}
+.feature[data-mode="food"]{background:var(--food)}
+.feature[data-mode="stay"]{background:var(--stay)}
+.feature[data-mode="experience"]{background:var(--exp)}
+.feature[data-mode="pet"]{background:var(--pet)}
+.feature[data-mode="analysis"]{background:var(--analysis)}
+.feature.active{outline:3px solid rgba(7,95,171,.14);filter:saturate(1.12);transform:translateY(-1px)}
+.filterbar{
+  display:flex;align-items:center;gap:7px;padding:5px 8px;background:#fff;border-bottom:1px solid var(--line);
+  overflow-x:auto;scrollbar-width:none;z-index:1300
+}
+.filterbar::-webkit-scrollbar{display:none}
+.filterbar select,.filterbar input{
+  height:35px;border:1px solid #cfdbe4;border-radius:9px;background:#fff;padding:0 9px;flex:none
+}
+.filterbar select{min-width:112px}
+.filterbar input{min-width:180px;flex:1}
+.filterbar button{
+  height:35px;border:1px solid #cfdbe4;background:#fff;border-radius:9px;padding:0 10px;white-space:nowrap
+}
+.mapwrap{position:relative;min-height:0;overflow:hidden;background:#dce8f1}
+.map{height:100%;width:100%}
+.map-toolbar{
+  position:absolute;z-index:800;top:10px;right:10px;background:rgba(255,255,255,.96);
+  border:1px solid var(--line);border-radius:12px;padding:9px;box-shadow:var(--shadow);
+  display:none;gap:7px;max-height:58vh;overflow:auto
+}
+.map-toolbar.open{display:grid}
+.map-toolbar label{font-size:11px;display:flex;gap:7px;align-items:center}
+.layer-fab{
+  position:absolute;z-index:820;right:10px;top:10px;width:42px;height:42px;border:1px solid #d2dce4;
+  border-radius:12px;background:#fff;box-shadow:var(--shadow);font-size:18px
+}
+.count-badge{
+  position:absolute;z-index:810;left:10px;top:10px;background:rgba(255,255,255,.96);
+  border:1px solid var(--line);border-radius:999px;padding:8px 11px;box-shadow:0 5px 18px rgba(20,51,79,.12);
+  font-size:11px;font-weight:800;color:#34536d
+}
+.bottom-nav{
+  position:absolute;z-index:1200;left:50%;transform:translateX(-50%);
+  bottom:calc(7px + var(--safe-bottom));height:58px;width:min(96%,620px);
+  background:rgba(255,255,255,.98);border:1px solid var(--line);border-radius:18px;
+  box-shadow:0 10px 30px rgba(20,51,79,.18);display:grid;grid-template-columns:repeat(5,1fr);overflow:hidden
+}
+.bottom-nav button{border:0;background:transparent;font-size:9px;color:#607181;padding:5px 2px}
+.bottom-nav button b{display:block;font-size:18px;line-height:22px}
+.bottom-nav button.active{color:var(--blue);background:#eef7ff}
+.sheet{
+  position:absolute;z-index:1150;left:50%;transform:translate(-50%,115%);
+  bottom:calc(72px + var(--safe-bottom));width:min(94%,820px);max-height:min(64vh,620px);
+  background:#fff;border:1px solid var(--line);border-radius:20px 20px 16px 16px;
+  box-shadow:0 16px 44px rgba(20,51,79,.24);overflow:hidden;transition:transform .22s ease,max-height .22s ease
+}
+.sheet.open{transform:translate(-50%,0)}
+.sheet.full{max-height:calc(100% - 90px);height:calc(100% - 90px)}
+.sheet-head{
+  height:34px;display:grid;grid-template-columns:1fr auto;align-items:center;padding:0 8px 0 16px;
+  border-bottom:1px solid #eef2f5;background:#fff;position:sticky;top:0;z-index:20
+}
+.sheet-handle{width:44px;height:5px;background:#d5dde4;border-radius:999px;justify-self:center;margin-left:48px}
+.sheet-actions{display:flex;gap:3px}
+.sheet-actions button{border:0;background:#f2f6f9;border-radius:8px;width:30px;height:26px;color:#526878}
+.sheet-content{max-height:calc(min(64vh,620px) - 34px);overflow:auto;-webkit-overflow-scrolling:touch;background:#fff}
+.sheet.full .sheet-content{max-height:calc(100% - 34px)}
+.sheet-list-head{
+  display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fbfdff;border-bottom:1px solid var(--line)
+}
+.sheet-list-head b{font-size:14px}.sheet-list-head span{font-size:11px;color:var(--muted)}
+.card{
+  display:grid;grid-template-columns:88px 1fr;gap:10px;padding:11px 13px;border-bottom:1px solid #edf1f4;background:#fff;cursor:pointer
+}
+.card:hover,.card.active{background:#eef7ff}
+.thumb{width:88px;height:74px;border-radius:10px;object-fit:cover;background:#eaf0f4}
+.card-main{min-width:0}.card-title{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-sub{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}.badge{font-size:9px;border-radius:6px;padding:3px 5px;background:#eaf4ff;color:#0b5ea8}
+.badge.pet{background:#fff0f6;color:#c63370}.badge.green{background:#edf9f2;color:#16754d}.badge.orange{background:#fff4e8;color:#b85a10}
+.right-hero{height:190px;position:relative;background:linear-gradient(135deg,#0c6aa9,#7bd7e7);overflow:hidden}
+.right-hero img{width:100%;height:100%;object-fit:cover}
+.right-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(0,0,0,.6))}
+.hero-text{position:absolute;z-index:2;left:16px;right:16px;bottom:13px;color:#fff}
+.hero-text h2{margin:0;font-size:23px}.hero-text p{margin:5px 0 0;font-size:11px}
+.right-body{padding:12px 14px 18px}
+.detail-tabs{display:flex;gap:5px;overflow:auto;padding-bottom:8px;border-bottom:1px solid var(--line);background:#fff}
+.detail-tabs button{white-space:nowrap;border:1px solid #d5e0e8;background:#fff;border-radius:8px;padding:7px 9px;font-size:11px}
+.detail-tabs button.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}.metric{background:#f4f8fb;border-radius:10px;padding:9px}
+.metric span{display:block;font-size:9px;color:var(--muted)}.metric b{display:block;margin-top:3px;font-size:13px}
+.section{margin-top:15px}.section h3{font-size:14px;margin:0 0 8px}.kv{display:grid;grid-template-columns:100px 1fr;gap:7px;font-size:11px}.kv b{color:#65737f}
+.loading,.empty{padding:24px;text-align:center;color:var(--muted);font-size:12px}
+.tour-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mini{border:1px solid #e0e7ed;border-radius:10px;overflow:hidden;background:#fff;cursor:pointer}
+.mini img{width:100%;height:110px;object-fit:cover}.mini div{padding:7px}.mini b{font-size:11px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini small{font-size:9px;color:var(--muted)}
+.analysis-tabs{display:flex;gap:5px;overflow:auto;margin:8px 0}.analysis-tabs button{border:1px solid #d8e1e8;border-radius:999px;background:#fff;padding:6px 8px;font-size:10px;white-space:nowrap}
+.analysis-tabs button.active{background:#405f9d;color:#fff;border-color:#405f9d}.analysis-card{border:1px solid #dde5eb;border-radius:12px;padding:10px;margin-top:8px}
+.analysis-card b{font-size:12px}.analysis-card strong{font-size:22px;color:#245f9d;display:block;margin-top:5px}.analysis-card small{color:var(--muted)}
+.rank{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid #edf1f4;font-size:11px}
+.rank i{display:grid;place-items:center;width:24px;height:24px;background:#eaf3ff;color:#075fab;border-radius:50%;font-style:normal;font-weight:800}
+.note{padding:10px;background:#fff8e9;border:1px solid #f0dfb7;color:#745a20;border-radius:9px;font-size:10px;margin-top:10px}
+.cluster{display:grid;place-items:center;border-radius:999px;background:#176fd0;color:#fff;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);font-weight:800}
+.dot{width:14px;height:14px;border-radius:50%;background:#0b72ce;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.legacy{display:none!important}
+
+@media(max-width:720px){
+  .app{grid-template-rows:58px 44px 43px 1fr}
+  .top{grid-template-columns:auto 1fr auto;gap:7px;padding:7px 8px}
+  .logo{width:38px;height:38px;font-size:20px}
+  .brand b{display:none}.brand small{display:none}
+  .top-actions button:not(:last-child){display:none}
+  .top-actions button{padding:6px;font-size:0}.top-actions button:last-child{font-size:17px}
+  .global-search input{height:39px;font-size:12px}.global-search button{height:31px;width:33px}
+  .featurebar{padding:4px 6px;gap:5px}.feature{min-width:92px;flex:0 0 92px;font-size:11px;padding:7px 6px}
+  .filterbar{padding:4px 6px}.filterbar select,.filterbar input,.filterbar button{height:33px;font-size:11px}
+  .filterbar select{min-width:104px}.filterbar input{min-width:150px}
+  .count-badge{top:8px;left:8px;padding:7px 9px}.layer-fab{right:8px;top:8px;width:39px;height:39px}
+  .map-toolbar{right:8px;top:52px}
+  .bottom-nav{width:calc(100% - 16px);bottom:calc(10px + var(--safe-bottom));height:56px;border-radius:16px}
+  .sheet{width:calc(100% - 10px);bottom:calc(76px + var(--safe-bottom));max-height:68vh;border-radius:18px 18px 14px 14px}
+  .sheet-content{max-height:calc(68vh - 34px)}
+  .right-hero{height:150px}.hero-text h2{font-size:20px}
+  .tour-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mini img{height:92px}
+  .card{grid-template-columns:80px 1fr}.thumb{width:80px;height:68px}
+}
+@media(max-width:390px){
+  .top-actions{display:none}.top{grid-template-columns:auto 1fr}
+  .feature{min-width:86px;flex-basis:86px}
+}
+
+/* ===== v1.3 PC Phone Shell =====
+   PC에서도 모바일 앱과 동일한 UI를 스마트폰 프레임 안에서 사용한다.
+   실제 모바일(<=720px)에서는 프레임 없이 전체 화면으로 동작한다.
+*/
+@media (min-width:721px){
+  html,body{width:100%;height:100%;overflow:hidden}
+  body{
+    display:grid;place-items:center;
+    background:
+      radial-gradient(circle at 20% 20%,rgba(74,164,223,.16),transparent 28%),
+      radial-gradient(circle at 80% 80%,rgba(47,168,111,.10),transparent 26%),
+      #eaf0f4;
+  }
+  .app{
+    width:430px;
+    height:min(920px,96vh);
+    min-height:0;
+    grid-template-rows:58px 44px 43px 1fr;
+    border:1px solid #c9d6df;
+    border-radius:30px;
+    box-shadow:0 24px 70px rgba(21,51,74,.28);
+    overflow:hidden;
+    background:#fff;
+    position:relative;
+  }
+  .top{
+    grid-template-columns:auto 1fr;
+    gap:7px;padding:7px 8px
+  }
+  .logo{width:38px;height:38px;font-size:20px}
+  .brand b,.brand small,.top-actions{display:none}
+  .global-search input{height:39px;font-size:12px}
+  .global-search button{height:31px;width:33px}
+  .search-suggest{top:43px;max-height:330px}
+  .featurebar{padding:4px 6px;gap:5px}
+  .feature{min-width:86px;flex:0 0 86px;font-size:11px;padding:7px 6px}
+  .filterbar{padding:4px 6px}
+  .filterbar select,.filterbar input,.filterbar button{height:33px;font-size:11px}
+  .filterbar select{min-width:104px}
+  .filterbar input{min-width:150px}
+  .count-badge{top:8px;left:8px;padding:7px 9px}
+  .layer-fab{right:8px;top:8px;width:39px;height:39px}
+  .map-toolbar{right:8px;top:52px}
+  .bottom-nav{
+    width:calc(100% - 16px);
+    bottom:calc(10px + var(--safe-bottom));
+    height:56px;border-radius:16px
+  }
+  .sheet{
+    width:calc(100% - 10px);
+    bottom:calc(76px + var(--safe-bottom));
+    max-height:68vh;
+    border-radius:18px 18px 14px 14px
+  }
+  .sheet-content{max-height:calc(68vh - 34px)}
+  .right-hero{height:150px}
+  .hero-text h2{font-size:20px}
+  .tour-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mini img{height:92px}
+  .card{grid-template-columns:80px 1fr}
+  .thumb{width:80px;height:68px}
+}
+
+
+/* ===== v1.4 refinement ===== */
+
+/* 검색 피커 */
+#searchBtn{
+  font-size:20px!important;
+  line-height:1!important;
+  transition:transform .15s ease, background .15s ease;
+}
+#searchBtn.open{transform:rotate(180deg);background:#0a579b}
+.search-suggest{
+  top:43px;
+  max-height:430px;
+  padding:0;
+  border-radius:12px;
+  overscroll-behavior:contain;
+}
+.suggest-head{
+  position:sticky;top:0;z-index:4;
+  padding:7px 10px;
+  background:#f1f6fa;
+  border-bottom:1px solid #dde6ed;
+  color:#506879;font-size:10px;font-weight:900
+}
+.suggest-row.theme{
+  grid-template-columns:30px minmax(0,1fr) auto;
+}
+.suggest-icon{
+  width:28px;height:28px;border-radius:9px;
+  display:grid;place-items:center;
+  background:#eef5fb;font-size:15px
+}
+.suggest-row.village-row{
+  grid-template-columns:minmax(0,1fr) auto
+}
+.suggest-initials{
+  position:sticky;top:29px;z-index:3;
+  display:flex;gap:3px;overflow-x:auto;
+  padding:5px 7px;background:#e8f1f7;
+  border-bottom:1px solid #d9e4eb;
+  scrollbar-width:none
+}
+.suggest-initials::-webkit-scrollbar{display:none}
+.suggest-initials button{
+  flex:none;border:1px solid #cbd8e1;background:#fff;
+  border-radius:7px;padding:4px 6px;font-size:9px;
+  font-weight:800;color:#405665
+}
+.suggest-letter{
+  padding:6px 10px;
+  background:#f6f9fb;
+  border-top:1px solid #e0e7ec;
+  border-bottom:1px solid #e5ebef;
+  font-size:10px;font-weight:900;color:#315c78
+}
+
+/* 지역 칩: 기존 앱의 지역선택 위치를 복원 */
+.regionbar{
+  display:flex;align-items:center;gap:5px;
+  padding:5px 6px;
+  background:#fff;border-bottom:1px solid var(--line);
+  overflow-x:auto;scrollbar-width:none;z-index:1450
+}
+.regionbar::-webkit-scrollbar{display:none}
+.region-chip{
+  flex:none;border:1px solid #cfdae3;background:#fff;
+  border-radius:999px;padding:6px 10px;
+  font-size:10px;font-weight:800;color:#435c6f;
+  white-space:nowrap
+}
+.region-chip.active{
+  background:#1266b0;color:#fff;border-color:#1266b0
+}
+
+/* 필터행은 반경/어촌계 필터/초기화만 */
+.filterbar{gap:6px}
+.filterbar select{min-width:112px}
+.filterbar input{min-width:0;flex:1;width:100%}
+.filterbar button{padding:0 9px}
+
+/* 하단 네비: 떠 있는 카드가 아니라 실제 앱 하단바 */
+.bottom-nav{
+  left:0!important;right:0!important;transform:none!important;
+  bottom:0!important;
+  width:100%!important;height:60px!important;
+  border-radius:0!important;
+  border:0!important;border-top:1px solid #d8e2e9!important;
+  box-shadow:0 -3px 14px rgba(25,54,77,.08)!important;
+  background:#fff!important;
+  padding-bottom:var(--safe-bottom);
+}
+.bottom-nav button{
+  background:#fff!important;
+  border-radius:0!important;
+}
+.bottom-nav button.active{background:#eef7ff!important}
+
+/* Bottom Sheet도 하단바 바로 위에 붙인다 */
+.sheet{
+  bottom:calc(60px + var(--safe-bottom))!important;
+  width:100%!important;
+  border-left:0!important;border-right:0!important;
+  border-bottom:0!important;
+  border-radius:18px 18px 0 0!important;
+}
+.sheet.full{
+  height:calc(100% - 60px)!important;
+  max-height:calc(100% - 60px)!important
+}
+
+/* 지도 하단은 네비에 가려지지 않게 */
+.mapwrap{padding-bottom:60px;background:#fff}
+.map{height:100%}
+
+/* PC phone shell에서도 동일한 배치 */
+@media (min-width:721px){
+  .app{grid-template-rows:58px 40px 43px 1fr}
+  .regionbar{padding:5px 6px}
+  .bottom-nav{bottom:0!important;width:100%!important}
+  .sheet{bottom:60px!important;width:100%!important}
+}
+@media (max-width:720px){
+  .app{grid-template-rows:58px 40px 43px 1fr}
+  .regionbar{padding:5px 6px}
+  .bottom-nav{bottom:0!important;width:100%!important}
+  .sheet{bottom:calc(60px + var(--safe-bottom))!important;width:100%!important}
+}
+
+
+/* ===== v1.5 search + region refinement ===== */
+
+/* 검색 드롭다운: 기능명 + 실제 어촌계명을 바로 보여준다 */
+.search-suggest{
+  max-height:420px!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+}
+.suggest-head{
+  top:0!important;
+}
+.suggest-row{
+  cursor:pointer!important;
+}
+.suggest-row:hover,
+.suggest-row:focus{
+  background:#e8f4ff!important;
+  outline:none!important;
+}
+.suggest-village-list{
+  background:#fff;
+}
+.suggest-letter{
+  position:sticky;
+  top:29px;
+  z-index:2;
+}
+
+/* 지역선택 바: 숨겨진 지역을 직접 드래그/스크롤 가능 */
+.regionbar{
+  overflow-x:scroll!important;
+  overflow-y:hidden!important;
+  scrollbar-width:auto!important;
+  scrollbar-color:#8fa6b7 #e8eef3!important;
+  padding-bottom:8px!important;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+}
+.regionbar::-webkit-scrollbar{
+  display:block!important;
+  height:8px!important;
+}
+.regionbar::-webkit-scrollbar-track{
+  background:#e8eef3!important;
+  border-radius:999px!important;
+}
+.regionbar::-webkit-scrollbar-thumb{
+  background:#8fa6b7!important;
+  border-radius:999px!important;
+}
+.region-chip{
+  scroll-snap-align:start;
+}
+
+/* 검색 필터 전용 입력은 제거하므로 필터바 단순화 */
+.filterbar{
+  display:grid!important;
+  grid-template-columns:1fr auto!important;
+  gap:6px!important;
+}
+.filterbar #radius{
+  width:100%!important;
+}
+.filterbar #resetBtn{
+  min-width:78px!important;
+}
+
+
+/* ===== v1.6 map rendering fix ===== */
+.mapwrap{min-height:320px!important}
+#map{min-height:320px!important;background:#dce8f1!important}
+
+
+/* ===== v1.7 search list visibility fix ===== */
+
+/* 검색 트리거는 삼각형 버튼 하나만 absolute */
+#searchBtn{
+  position:absolute!important;
+  right:4px!important;
+  top:4px!important;
+  width:36px!important;
+  height:34px!important;
+  border:0!important;
+  border-radius:9px!important;
+  background:var(--blue)!important;
+  color:#fff!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  z-index:10!important;
+}
+
+/* 드롭다운의 실제 기능/어촌계 항목은 절대배치 금지 */
+#searchSuggest button.suggest-row{
+  position:static!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:46px!important;
+  padding:8px 10px!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:#19344b!important;
+  display:grid!important;
+  box-shadow:none!important;
+  transform:none!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+#searchSuggest button.suggest-row + button.suggest-row{
+  border-top:1px solid #edf1f4!important;
+}
+#searchSuggest button.suggest-row:hover,
+#searchSuggest button.suggest-row:focus{
+  background:#eaf5ff!important;
+}
+#searchSuggest .suggest-main{
+  display:block!important;
+  min-width:0!important;
+}
+#searchSuggest .suggest-main b{
+  display:block!important;
+  color:#18384f!important;
+  font-size:12px!important;
+  line-height:1.35!important;
+}
+#searchSuggest .suggest-main small{
+  display:block!important;
+  color:#71808c!important;
+  font-size:10px!important;
+  margin-top:2px!important;
+}
+#searchSuggest .suggest-tag{
+  display:inline-block!important;
+}
+
+/* 기능행 3열 / 어촌계행 2열을 명시 */
+#searchSuggest .suggest-row.theme{
+  grid-template-columns:30px minmax(0,1fr) auto!important;
+  gap:8px!important;
+}
+#searchSuggest .suggest-row.village-row{
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:8px!important;
+}
+
+/* 목록이 길어도 내부 스크롤로 선택 가능 */
+#searchSuggest{
+  overscroll-behavior:contain!important;
+  scrollbar-gutter:stable;
+}
+
+
+/* ===== v1.8 initials restore ===== */
+.suggest-initials{
+  position:sticky;
+  top:29px;
+  z-index:4;
+  display:flex;
+  gap:4px;
+  overflow-x:auto;
+  padding:6px 8px 7px;
+  background:#eef4f8;
+  border-bottom:1px solid #d9e4eb;
+  scrollbar-width:auto;
+  scrollbar-color:#93a9b9 #e7edf2;
+}
+.suggest-initials::-webkit-scrollbar{
+  display:block;
+  height:6px;
+}
+.suggest-initials::-webkit-scrollbar-track{
+  background:#e7edf2;
+  border-radius:999px;
+}
+.suggest-initials::-webkit-scrollbar-thumb{
+  background:#93a9b9;
+  border-radius:999px;
+}
+.suggest-initials button{
+  position:static!important;
+  flex:none;
+  width:auto!important;
+  min-width:30px!important;
+  height:28px!important;
+  padding:0 8px!important;
+  border:1px solid #c9d7e1!important;
+  border-radius:999px!important;
+  background:#fff!important;
+  color:#3d5668!important;
+  font-size:10px!important;
+  font-weight:900!important;
+  box-shadow:none!important;
+}
+.suggest-initials button.active{
+  background:#1266b0!important;
+  color:#fff!important;
+  border-color:#1266b0!important;
+}
+.suggest-letter{
+  position:sticky;
+  top:70px;
+  z-index:3;
+  padding:7px 10px;
+  background:#f7fafc;
+  border-top:1px solid #e0e7ec;
+  border-bottom:1px solid #e5ebef;
+  font-size:10px;
+  font-weight:900;
+  color:#315c78;
+}
+
+
+/* ===== v1.9 cluster click expansion ===== */
+.cluster{
+  cursor:pointer;
+  user-select:none;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+.cluster:hover{
+  transform:scale(1.07);
+  box-shadow:0 4px 12px rgba(0,0,0,.30);
+}
+
+</style>
+
+</head>
+
+<body>
+<div class="app">
+<header class="top">
+  <div class="brand">
+    <div class="logo">⚓</div>
+    <div><b>어촌관광정보앱</b><small>바다와 사람이 만나는 여행</small></div>
+  </div>
+  <div class="global-search" id="globalSearchBox">
+    <input id="search" autocomplete="off" placeholder="어촌계 · 관광 · 먹거리 · 숙박 · 체험 · 반려동물 · 분석">
+    <button id="searchBtn" aria-label="검색목록 열기" title="검색목록 열기">▾</button>
+    <div class="search-suggest" id="searchSuggest"></div>
+  </div>
+  <div class="top-actions">
+    <button id="locBtn">◎ 내위치</button>
+    <button>♡ 즐겨찾기</button>
+    <button id="menuBtn">☰ 메뉴</button>
+  </div>
+</header>
+
+<nav class="regionbar" id="regionBar" aria-label="지역 선택"></nav>
+
+<div class="filterbar">
+  <select id="region" hidden aria-hidden="true"><option value="전체">전체</option></select>
+  <select id="radius">
+    <option value="1000">반경 1km</option>
+    <option value="3000" selected>반경 3km</option>
+    <option value="5000">반경 5km</option>
+    <option value="10000">반경 10km</option>
+  </select>
+<button id="resetBtn">↻ 초기화</button>
+</div>
+
+<main class="mapwrap">
+  <div class="map" id="map"></div>
+  <div class="count-badge" id="mapCount">어촌계 0개</div>
+
+  <button class="layer-fab" id="layerBtn" aria-label="지도 레이어">☷</button>
+  <div class="map-toolbar" id="mapToolbar">
+    <label><input type="checkbox" checked data-layer="village"> 어촌계</label>
+    <label><input type="checkbox" data-layer="tour"> 관광지</label>
+    <label><input type="checkbox" data-layer="food"> 먹거리</label>
+    <label><input type="checkbox" data-layer="stay"> 숙박</label>
+    <label><input type="checkbox" data-layer="experience"> 체험</label>
+    <label><input type="checkbox" data-layer="pet"> 반려동물</label>
+  </div>
+
+  <nav class="bottom-nav" id="bottomNav">
+    <button data-nav="map" class="active"><b>🗺</b>지도</button>
+    <button data-nav="list"><b>☷</b>목록</button>
+    <button data-nav="nearby"><b>📍</b>주변</button>
+    <button data-nav="analysis"><b>📊</b>분석</button>
+    <button data-nav="menu"><b>☰</b>메뉴</button>
+  </nav>
+
+  <section class="sheet" id="mobileSheet" aria-live="polite">
+    <div class="sheet-head">
+      <div class="sheet-handle"></div>
+      <div class="sheet-actions">
+        <button id="sheetExpand" title="확대/축소">↕</button>
+        <button id="sheetClose" title="닫기">×</button>
+      </div>
+    </div>
+    <div class="sheet-content" id="sheetContent"></div>
+  </section>
+</main>
+
+<div class="legacy" aria-hidden="true">
+  <b id="listTitle">전체 어촌계</b><span id="count"></span>
+  <div id="list"></div>
+  <aside id="right"></aside>
+</div>
+</div>
+<script src="./config.js"></script>
+
+<script src="./villages.js"></script>
+<script src="./kto-area-codes.js"></script>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const CFG=window.APP_CONFIG||{};
+const FALLBACK={village:'./assets/fallback-village.svg',tour:'./assets/fallback-tour.svg',food:'./assets/fallback-food.svg',stay:'./assets/fallback-stay.svg',experience:'./assets/fallback-experience.svg',pet:'./assets/fallback-pet.svg'};
+const TYPE={tour:'',food:'39',stay:'32',experience:'28',pet:''};
+const S={all:window.VILLAGES||[],visible:[],map:null,vLayer:null,dataLayer:null,spiderLayer:null,selected:null,mode:'village',tourItems:[],petItems:[],selectedTour:null,area:null,analysisTab:'demand'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const fmt=v=>{if(v===null||v===undefined||v===''||String(v)==='nan')return '—';const n=Number(String(v).replaceAll(',',''));return Number.isFinite(n)?n.toLocaleString('ko-KR'):String(v)};
+const imgUrl=(u,kind='tour')=>u?String(u).replace(/^http:\/\//i,'https://'):FALLBACK[kind]||FALLBACK.tour;
+function api(path){return `${String(CFG.WORKER_BASE_URL||'').replace(/\/$/,'')}${path}`}
+async function getJSON(path){const r=await fetch(api(path),{cache:'no-store'});const j=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));if(!r.ok||j.ok===false)throw new Error(j.error||`HTTP ${r.status}`);return j}
+const AREA_OVERRIDES={
+  // 주소 공란/오타/행정구역 생략 등 자동판정이 불가능하거나 모호한 4개 예외
+  FV0708:{areaCd:'41',areaNm:'경기도',signguCd:'41273',signguNm:'안산시 단원구'},
+  FV0759:{areaCd:'41',areaNm:'경기도',signguCd:'41590',signguNm:'화성시'},
+  FV1792:{areaCd:'50',areaNm:'제주특별자치도',signguCd:'50130',signguNm:'서귀포시'},
+  FV1795:{areaCd:'50',areaNm:'제주특별자치도',signguCd:'50130',signguNm:'서귀포시'}
+};
+
+function provinceAlias(areaNm){
+  const m={
+    '서울특별시':'서울','부산광역시':'부산','대구광역시':'대구','인천광역시':'인천',
+    '광주광역시':'광주','대전광역시':'대전','울산광역시':'울산','세종특별자치시':'세종',
+    '경기도':'경기','강원특별자치도':'강원','충청북도':'충북','충청남도':'충남',
+    '전북특별자치도':'전북','전라남도':'전남','경상북도':'경북','경상남도':'경남',
+    '제주특별자치도':'제주'
+  };
+  return m[areaNm]||areaNm;
+}
+function geoNorm(s){
+  return String(s||'').replace(/[^0-9가-힣]/g,'');
+}
+function detectProvinceFromAddress(address){
+  const s=String(address||'');
+  const full={
+    서울:['서울특별시','서울시'],부산:['부산광역시','부산시'],대구:['대구광역시','대구시'],
+    인천:['인천광역시','인천시'],광주:['광주광역시','광주시'],대전:['대전광역시','대전시'],
+    울산:['울산광역시','울산시'],세종:['세종특별자치시','세종시'],경기:['경기도'],
+    강원:['강원특별자치도','강원도'],충북:['충청북도'],충남:['충청남도'],
+    전북:['전북특별자치도','전라북도'],전남:['전라남도'],경북:['경상북도'],
+    경남:['경상남도'],제주:['제주특별자치도','제주도']
+  };
+
+  // '대구면'을 '대구광역시'로 오인하지 않도록 긴 공식명칭을 우선 검사
+  for(const [abbr,vars] of Object.entries(full)){
+    if(vars.some(x=>s.includes(x)))return abbr;
+  }
+
+  // 축약 도명/광역시는 주소 앞부분의 독립 토큰일 때만 인정
+  const tokens=s.trim().split(/\s+/).slice(0,3)
+    .map(x=>x.replace(/[^가-힣]/g,''));
+  const short=new Set(Object.keys(full));
+  return tokens.find(x=>short.has(x))||null;
+}
+function allowedProvinceAliases(region){
+  if(region==='충청')return new Set(['충북','충남']);
+  if(region==='경인')return new Set(['경기','인천']);
+  // 부경신항 등 기존 어촌계 분류가 부산·울산 주소를 포함하는 예외를 허용
+  if(region==='경남')return new Set(['경남','부산','울산']);
+  return new Set([region]);
+}
+function signguTokens(name){
+  return String(name||'').match(/[가-힣]+?(?:특별자치시|시|군|구)/g)||[];
+}
+function signguBase(token){
+  return String(token||'').replace(/(특별자치시|시|군|구)$/,'');
+}
+function scoreAreaCandidate(r,v){
+  const addr=geoNorm(v.address||'');
+  const union=geoNorm(v.union||'');
+  const full=geoNorm(r.signguNm||'');
+  const tokens=signguTokens(r.signguNm);
+  let score=0;
+
+  if(full&&addr.includes(full))score+=300+full.length;
+
+  const tokenHits=tokens.filter(t=>addr.includes(geoNorm(t)));
+  score+=80*tokenHits.length;
+
+  const baseHits=tokens
+    .map(signguBase)
+    .filter(b=>b.length>=2&&addr.includes(geoNorm(b)));
+  score+=35*baseHits.length;
+
+  if(full&&union.includes(full))score+=160;
+
+  const unionBaseHits=tokens
+    .map(signguBase)
+    .filter(b=>b.length>=2&&union.includes(geoNorm(b)));
+  score+=70*unionBaseHits.length;
+
+  return score;
+}
+function resolveArea(v){
+  if(AREA_OVERRIDES[v.id])return AREA_OVERRIDES[v.id];
+
+  const rows=window.KTO_AREA_CODES||[];
+  const explicitProvince=detectProvinceFromAddress(v.address||'');
+  const allowed=explicitProvince
+    ? new Set([explicitProvince])
+    : allowedProvinceAliases(v.region||'');
+
+  const candidates=rows
+    .filter(r=>allowed.has(provinceAlias(r.areaNm)))
+    .map(r=>({r,score:scoreAreaCandidate(r,v)}))
+    .filter(x=>x.score>0)
+    .sort((a,b)=>b.score-a.score||geoNorm(b.r.signguNm).length-geoNorm(a.r.signguNm).length);
+
+  if(!candidates.length)return null;
+
+  // 같은 점수·같은 길이로 2개 이상 남으면 임의판정하지 않는다.
+  const top=candidates[0];
+  const ties=candidates.filter(x=>
+    x.score===top.score &&
+    geoNorm(x.r.signguNm).length===geoNorm(top.r.signguNm).length
+  );
+  if(ties.length>1)return null;
+
+  return top.r;
+}
+function regionOptions(){
+  const preferred=['경인','강원','충청','전북','전남','경북','경남','부산','제주'];
+  const actual=[...new Set(S.all.map(v=>v.region).filter(Boolean))];
+  const regs=[
+    ...preferred.filter(r=>actual.includes(r)),
+    ...actual.filter(r=>!preferred.includes(r)).sort((a,b)=>a.localeCompare(b,'ko'))
+  ];
+  $('#region').innerHTML='<option value="전체">전체</option>'+regs.map(r=>`<option>${esc(r)}</option>`).join('');
+  $('#regionBar').innerHTML=['전체',...regs].map(r=>`<button class="region-chip ${r==='전체'?'active':''}" data-region="${esc(r)}">${esc(r)}</button>`).join('');
+  $$('[data-region]').forEach(b=>b.onclick=()=>setRegion(b.dataset.region));
+}
+function setRegion(region){
+  SEARCH_INITIAL='전체';
+  $('#region').value=region;
+  $$('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===region));
+  renderVillageList();drawVillages();
+  const rows=S.all.filter(matchVillage);
+  if(rows.length){
+    if(region==='전체'){
+      const b=L.latLngBounds(rows.map(v=>[v.lat,v.lng]));
+      S.map.fitBounds(b,{padding:[18,18],maxZoom:7});
+    }else if(rows.length===1){
+      S.map.setView([rows[0].lat,rows[0].lng],11);
+    }else{
+      S.map.fitBounds(L.latLngBounds(rows.map(v=>[v.lat,v.lng])),{padding:[18,18],maxZoom:10});
+    }
+  }
+  if($('#searchSuggest')?.classList.contains('open'))renderSearchSuggest();
+}
+function matchVillage(v){
+  const r=$('#region')?.value||'전체';
+  return r==='전체'||v.region===r;
+}
+function renderVillageList(){
+  S.visible=S.all.filter(matchVillage);
+  $('#listTitle').textContent='전체 어촌계';
+  $('#count').textContent=`${fmt(S.visible.length)}개`;
+  $('#mapCount').textContent=`어촌계 ${fmt(S.visible.length)}개`;
+  $('#list').innerHTML=S.visible.slice(0,500).map(v=>`<article class="card ${S.selected?.id===v.id?'active':''}" data-village="${v.id}"><img class="thumb" src="${FALLBACK.village}" alt="대표 이미지"><div class="card-main"><div class="card-title">${esc(v.name)}어촌계</div><div class="card-sub">${esc(v.union||v.region)} · ${esc(v.address||'주소 정보 없음')}</div><div class="badges"><span class="badge">${esc(v.region)}</span>${v.tour?'<span class="badge green">체험</span>':''}${v.minbak?'<span class="badge">민박</span>':''}</div></div></article>`).join('')+(S.visible.length>500?`<div class="empty">검색 결과가 많아 상위 500개만 표시합니다. 지역이나 이름으로 좁혀보세요.</div>`:'');
+  $$('[data-village]').forEach(el=>el.onclick=()=>selectVillage(S.all.find(v=>v.id===el.dataset.village)));
+}
+function renderDataList(items,kind){const titles={tour:'주변 관광지',food:'주변 먹거리',stay:'주변 숙박',experience:'주변 체험·레포츠',pet:'반려동물 동반 여행'};$('#listTitle').textContent=titles[kind]||'검색 결과';$('#count').textContent=`${items.length}개`;$('#list').innerHTML=items.length?items.map((x,i)=>`<article class="card" data-item="${i}"><img class="thumb" src="${imgUrl(x.image,kind)}" onerror="this.onerror=null;this.src='${FALLBACK[kind]||FALLBACK.tour}'"><div class="card-main"><div class="card-title">${esc(x.title||'이름 없음')}</div><div class="card-sub">${esc(x.address||'주소 정보 없음')}</div><div class="badges">${x.distanceM!=null?`<span class="badge">${Math.round(x.distanceM)}m</span>`:''}<span class="badge ${kind==='pet'?'pet':''}">${titles[kind]}</span></div></div></article>`).join(''):'<div class="empty">검색 결과가 없습니다.</div>';$$('[data-item]').forEach(el=>el.onclick=()=>selectTourItem(items[Number(el.dataset.item)],kind))}
+const CLUSTER_CELL_PX=72;
+const CLUSTER_MAX_ZOOM=19;
+
+function clusterGroupsAtZoom(list,z){
+  if(!list.length)return [];
+  if(z<=5)return [list];
+
+  // 위·경도 degree grid 대신 Leaflet WebMercator pixel grid 사용.
+  // zoom이 1단계 커지면 world pixel 좌표가 2배가 되므로
+  // 기존 클러스터가 확대하면서 자연스럽게 쪼개지고 다시 합쳐지지 않는다.
+  const m=new Map();
+  for(const v of list){
+    const p=S.map.project(L.latLng(v.lat,v.lng),z);
+    const k=`${Math.floor(p.x/CLUSTER_CELL_PX)}_${Math.floor(p.y/CLUSTER_CELL_PX)}`;
+    (m.get(k)||m.set(k,[]).get(k)).push(v);
+  }
+  return [...m.values()];
+}
+
+function clusterGroups(list){
+  return clusterGroupsAtZoom(list,S.map.getZoom());
+}
+
+function villageIcon(n){
+  if(n>1){
+    const s=Math.min(48,26+Math.log2(n)*5);
+    return L.divIcon({
+      className:'',
+      html:`<div class="cluster" style="width:${s}px;height:${s}px">${n}</div>`,
+      iconSize:[s,s],
+      iconAnchor:[s/2,s/2]
+    });
+  }
+  return L.divIcon({
+    className:'',
+    html:'<div class="dot"></div>',
+    iconSize:[16,16],
+    iconAnchor:[8,8]
+  });
+}
+
+function groupCenter(group){
+  return [
+    group.reduce((a,v)=>a+v.lat,0)/group.length,
+    group.reduce((a,v)=>a+v.lng,0)/group.length
+  ];
+}
+
+function distinctCoords(group){
+  const s=new Set(group.map(v=>`${Number(v.lat).toFixed(10)}|${Number(v.lng).toFixed(10)}`));
+  return s.size;
+}
+
+function nextSplitZoom(group,currentZoom){
+  for(let z=Math.max(6,Math.floor(currentZoom)+1);z<=CLUSTER_MAX_ZOOM;z++){
+    if(clusterGroupsAtZoom(group,z).length>1)return z;
+  }
+  return null;
+}
+
+function spiderfyGroup(group,center){
+  if(!S.spiderLayer)return;
+
+  S.spiderLayer.clearLayers();
+
+  const c=L.latLng(center[0],center[1]);
+  const cp=S.map.latLngToContainerPoint(c);
+  const n=group.length;
+  const radius=n<=3?34:Math.min(60,30+n*4);
+
+  group.forEach((v,i)=>{
+    const angle=(-Math.PI/2)+(Math.PI*2*i/n);
+    const pt=L.point(
+      cp.x+Math.cos(angle)*radius,
+      cp.y+Math.sin(angle)*radius
+    );
+    const ll=S.map.containerPointToLatLng(pt);
+
+    L.polyline([c,ll],{
+      color:'#6d8799',
+      weight:1.5,
+      opacity:.8,
+      interactive:false
+    }).addTo(S.spiderLayer);
+
+    L.marker(ll,{icon:villageIcon(1)})
+      .addTo(S.spiderLayer)
+      .bindTooltip(`${v.name}어촌계`,{direction:'top'})
+      .on('click',e=>{
+        L.DomEvent.stopPropagation(e);
+        selectVillage(v);
+      });
+  });
+
+  L.popup({closeButton:true,autoPan:false,offset:[0,-8]})
+    .setLatLng(c)
+    .setContent(`<b>동일 좌표 어촌계 ${group.length}개</b><br><span style="font-size:11px">주변 점을 눌러 개별 어촌계를 선택하십시오.</span>`)
+    .openOn(S.map);
+}
+
+function expandCluster(group,lat,lng,currentZoom){
+  if(group.length<=1){
+    selectVillage(group[0]);
+    return;
+  }
+
+  // 전국 단일 클러스터: 첫 클릭은 대한민국 어촌권역이 보이도록 자동 확대
+  const rows=S.all.filter(matchVillage);
+  if(currentZoom<=5 && group.length===rows.length){
+    const b=L.latLngBounds(group.map(v=>[v.lat,v.lng]));
+    S.map.fitBounds(b,{padding:[30,30],maxZoom:7});
+    return;
+  }
+
+  // 클릭할 때마다 실제로 분리되는 다음 zoom 단계로 바로 이동
+  const targetZoom=nextSplitZoom(group,currentZoom);
+  if(targetZoom!==null){
+    const center=groupCenter(group);
+    S.map.setView(center,Math.min(CLUSTER_MAX_ZOOM,targetZoom),{animate:true});
+    return;
+  }
+
+  // 같은 좌표를 공유하는 경우에는 확대만으로 절대 분리되지 않으므로 spiderfy
+  // 전국 데이터에서 이런 중복좌표 그룹도 존재하므로 마지막 단계까지 선택 가능하게 한다.
+  const center=groupCenter(group);
+  if(S.map.getZoom()<CLUSTER_MAX_ZOOM){
+    S.map.once('moveend',()=>spiderfyGroup(group,center));
+    S.map.setView(center,CLUSTER_MAX_ZOOM,{animate:true});
+  }else{
+    spiderfyGroup(group,center);
+  }
+}
+
+function drawVillages(){
+  S.vLayer.clearLayers();
+  S.spiderLayer?.clearLayers();
+
+  const rows=S.all.filter(matchVillage);
+  const groups=clusterGroups(rows);
+  const z=S.map.getZoom();
+
+  for(const group of groups){
+    let lat,lng;
+
+    // 전국/필터 결과 전체가 하나로 합쳐진 경우에는 현재 지도 정중앙에 합계 표시
+    if(z<=5 && groups.length===1 && group.length===rows.length){
+      const c=S.map.getCenter();
+      lat=c.lat; lng=c.lng;
+    }else{
+      [lat,lng]=groupCenter(group);
+    }
+
+    const mk=L.marker([lat,lng],{
+      icon:villageIcon(group.length),
+      keyboard:true,
+      title:group.length>1?`${group.length}개 어촌계 - 클릭하여 펼치기`:`${group[0].name}어촌계`
+    }).addTo(S.vLayer);
+
+    if(group.length>1){
+      mk.bindTooltip(`${group.length}개 어촌계 · 클릭하여 펼치기`)
+        .on('click',e=>{
+          L.DomEvent.stopPropagation(e);
+          expandCluster(group,lat,lng,z);
+        });
+    }else{
+      mk.bindTooltip(`${group[0].name}어촌계`)
+        .on('click',e=>{
+          L.DomEvent.stopPropagation(e);
+          selectVillage(group[0]);
+        });
+    }
+  }
+}
+function dataMarker(item,kind){const color={tour:'#14a7bd',food:'#f28b35',stay:'#7c55b7',experience:'#2aa86f',pet:'#e04d82'}[kind]||'#1d76c8';return L.divIcon({className:'',html:`<div class="dot" style="background:${color}"></div>`,iconSize:[16,16],iconAnchor:[8,8]})}
+function drawData(items,kind){S.dataLayer.clearLayers();for(const x of items){if(!Number.isFinite(x.lat)||!Number.isFinite(x.lon))continue;L.marker([x.lat,x.lon],{icon:dataMarker(x,kind)}).addTo(S.dataLayer).bindTooltip(esc(x.title)).on('click',()=>selectTourItem(x,kind))}}
+function rightShell(v,body,hero){const src=hero||FALLBACK.village;return `<div class="right-hero"><img src="${src}" onerror="this.onerror=null;this.src='${FALLBACK.village}'"><div class="hero-text"><h2>${esc(v.name)}어촌계</h2><p>${esc(v.address||v.union||v.region)}</p></div></div><div class="right-body"><div class="detail-tabs">${['village','tour','food','stay','experience','pet','analysis'].map(t=>`<button data-detail="${t}" class="${S.mode===t?'active':''}">${{village:'기본정보',tour:'주변관광',food:'먹거리',stay:'숙박',experience:'체험',pet:'반려동물',analysis:'관광분석'}[t]}</button>`).join('')}</div>${body}</div>`}
+function renderBasic(){const v=S.selected;if(!v)return emptyRight();const body=`<div class="metric-grid"><div class="metric"><span>계원</span><b>${fmt(v.members)}명</b></div><div class="metric"><span>동력어선</span><b>${fmt(v.boats)}척</b></div><div class="metric"><span>생산금액</span><b>${fmt(v.prodWon)}원</b></div></div><div class="section"><h3>어촌계 정보</h3><div class="kv"><b>지역</b><span>${esc(v.region)} · ${esc(v.union||'—')}</span><b>주요 생산품</b><span>${esc(v.products||'—')}</span><b>민박</b><span>${esc(String(v.minbak||'—'))}</span><b>어촌체험</b><span>${esc(String(v.tour||'—'))}</span><b>직거래 빈도</b><span>${esc(String(v.directFreq||'—'))}</span></div></div><div class="note">어촌계 기본정보는 보유 원자료를 사용하고, 관광정보는 한국관광공사 API를 실시간 호출합니다.</div>`;setRight(rightShell(v,body))}
+function openSheet(){const s=$('#mobileSheet');s.classList.add('open');}
+function closeSheet(){const s=$('#mobileSheet');s.classList.remove('open','full');}
+function toggleSheetFull(){const s=$('#mobileSheet');s.classList.add('open');s.classList.toggle('full')}
+function emptyRight(){
+  const h='<div class="empty"><b>어촌계를 선택하십시오.</b><br><br>지도 마커 또는 목록에서 어촌계를 선택하면<br>주변관광·먹거리·숙박·체험·반려동물·관광분석이 열립니다.</div>';
+  $('#right').innerHTML=h;$('#sheetContent').innerHTML=h;bindDetailTabs();
+}
+function setRight(html){
+  $('#right').innerHTML=html;
+  $('#sheetContent').innerHTML=html;
+  bindDetailTabs();
+}
+function showVillageSheet(){
+  renderVillageList();
+  const rows=S.visible.slice(0,500);
+  $('#sheetContent').innerHTML=`<div class="sheet-list-head"><b>어촌계 목록</b><span>${fmt(S.visible.length)}개</span></div>${rows.map(v=>`<article class="card ${S.selected?.id===v.id?'active':''}" data-sheet-village="${v.id}"><img class="thumb" src="${FALLBACK.village}" alt="대표 이미지"><div class="card-main"><div class="card-title">${esc(v.name)}어촌계</div><div class="card-sub">${esc(v.union||v.region)} · ${esc(v.address||'주소 정보 없음')}</div><div class="badges"><span class="badge">${esc(v.region)}</span>${v.tour?'<span class="badge green">체험</span>':''}${v.minbak?'<span class="badge">민박</span>':''}</div></div></article>`).join('')}${S.visible.length>500?'<div class="empty">상위 500개만 표시합니다. 상단 필터로 범위를 좁혀보세요.</div>':''}`;
+  $$('[data-sheet-village]').forEach(el=>el.onclick=()=>selectVillage(S.all.find(v=>v.id===el.dataset.sheetVillage)));
+  openSheet();
+}
+function showMenuSheet(){
+  $('#sheetContent').innerHTML=`<div class="sheet-list-head"><b>기능 메뉴</b><span>어촌관광정보앱</span></div><div class="right-body"><div class="detail-tabs">${['village','tour','food','stay','experience','pet','analysis'].map(t=>`<button data-menu-mode="${t}">${{village:'지도/기본정보',tour:'주변관광',food:'먹거리',stay:'숙박',experience:'체험',pet:'반려동물',analysis:'관광분석'}[t]}</button>`).join('')}</div><div class="note">모바일과 PC에서 같은 조작방식을 사용합니다. 어촌계를 먼저 선택한 뒤 원하는 기능을 누르십시오.</div></div>`;
+  $$('[data-menu-mode]').forEach(b=>b.onclick=()=>{setMode(b.dataset.menuMode,true);if(S.selected||b.dataset.menuMode==='village')openSheet()});
+  openSheet();
+}
+function bindDetailTabs(){$$('[data-detail]').forEach(b=>b.onclick=()=>setMode(b.dataset.detail,true))}
+async function loadMode(kind){if(!S.selected)return;const v=S.selected,r=Number($('#radius').value||CFG.DEFAULT_RADIUS_M||3000),type=TYPE[kind]||'';setRight(rightShell(v,'<div class="loading">한국관광공사 데이터를 불러오는 중입니다...</div>'));try{if(kind==='pet'){const j=await getJSON(`/api/pet/nearby?mapX=${v.lng}&mapY=${v.lat}&radius=${r}&numOfRows=${CFG.DEFAULT_TOUR_ROWS||24}`);S.petItems=j.items||[];renderDataList(S.petItems,'pet');drawData(S.petItems,'pet');renderTourDetail(S.petItems,'pet')}else{const extra=type?`&contentTypeId=${type}`:'';const j=await getJSON(`/api/tour/nearby?mapX=${v.lng}&mapY=${v.lat}&radius=${r}&numOfRows=${CFG.DEFAULT_TOUR_ROWS||24}${extra}`);S.tourItems=j.items||[];renderDataList(S.tourItems,kind);drawData(S.tourItems,kind);renderTourDetail(S.tourItems,kind)}}catch(e){setRight(rightShell(v,`<div class="empty">API 호출 오류<br><small>${esc(e.message)}</small></div>`))}}
+function renderTourDetail(items,kind){const v=S.selected;const labels={tour:'주변 관광지',food:'먹거리',stay:'숙박',experience:'체험·레포츠',pet:'반려동물 동반 여행'};const body=`<div class="section"><h3>${labels[kind]} ${items.length}건</h3><div class="tour-grid">${items.slice(0,8).map((x,i)=>`<div class="mini" data-mini="${i}"><img src="${imgUrl(x.image,kind)}" onerror="this.onerror=null;this.src='${FALLBACK[kind]||FALLBACK.tour}'"><div><b>${esc(x.title)}</b><small>${x.distanceM!=null?Math.round(x.distanceM)+'m · ':''}${esc(x.address||'')}</small></div></div>`).join('')}</div></div>${items.length?'<div class="note">관광공사 이미지가 있으면 실사진을 우선 사용하고, 없으면 KAFV 대표 이미지가 표시됩니다.</div>':'<div class="empty">반경 내 데이터가 없습니다.</div>'}`;setRight(rightShell(v,body,items[0]?imgUrl(items[0].image,kind):FALLBACK[kind]));$$('[data-mini]').forEach(el=>el.onclick=()=>selectTourItem(items[Number(el.dataset.mini)],kind))}
+async function selectTourItem(item,kind){S.selectedTour=item;const v=S.selected;if(Number.isFinite(item.lat)&&Number.isFinite(item.lon))S.map.setView([item.lat,item.lon],15);let extra='';if(kind==='pet'&&item.contentId){extra='<div class="loading">반려동물 상세조건 조회 중...</div>'}const body=`<div class="section"><h3>${esc(item.title)}</h3><div class="kv"><b>주소</b><span>${esc(item.address||'—')}</span><b>거리</b><span>${item.distanceM!=null?Math.round(item.distanceM)+'m':'—'}</span><b>콘텐츠ID</b><span>${esc(item.contentId||'—')}</span></div></div>${extra}<div class="section"><button id="backList" style="border:0;border-radius:8px;background:#eef5fb;padding:8px 10px">목록으로</button></div>`;setRight(rightShell(v,body,imgUrl(item.image,kind)));$('#backList')?.addEventListener('click',()=>renderTourDetail(kind==='pet'?S.petItems:S.tourItems,kind));if(kind==='pet'&&item.contentId){try{const j=await getJSON(`/api/pet/detail?contentId=${encodeURIComponent(item.contentId)}`);const d=j.item||{};const sec=`<div class="section"><h3>반려동물 동반 조건</h3><div class="kv"><b>동반 범위</b><span>${esc(d.acmpyTypeCd||'—')}</span><b>동반 가능</b><span>${esc(d.acmpyPsblCpam||'—')}</span><b>필수사항</b><span>${esc(d.acmpyNeedMtr||'—')}</span><b>기타 안내</b><span>${esc(d.etcAcmpyInfo||'—')}</span></div></div>`;$('.right-body .loading')?.replaceWith(Object.assign(document.createElement('div'),{innerHTML:sec}).firstElementChild)}catch(e){$('.right-body .loading')?.replaceWith(Object.assign(document.createElement('div'),{className:'note',textContent:'상세조건을 불러오지 못했습니다.'}))}}}
+async function firstNonEmpty(builder){let last=null;for(const ym of (CFG.ANALYSIS_MONTHS||['202509','202504'])){try{const j=await getJSON(builder(ym));last=j;const items=j.body?.items?.item;const arr=Array.isArray(items)?items:(items?[items]:[]);if(arr.length)return {j,arr,ym}}catch(e){last={error:e.message}}}return {j:last,arr:[],ym:null}}
+function analysisNav(){return `<div class="analysis-tabs">${[['demand','수요'],['diversity','다양성'],['strength','수요강도'],['hub','중심관광지'],['related','연관관광지'],['forecast','집중률예측']].map(([k,n])=>`<button data-analysis="${k}" class="${S.analysisTab===k?'active':''}">${n}</button>`).join('')}</div>`}
+async function loadAnalysis(tab=S.analysisTab){const v=S.selected;if(!v)return;S.analysisTab=tab;S.area=resolveArea(v);const a=S.area;if(!a){setRight(rightShell(v,`${analysisNav()}<div class="empty">이 어촌계의 관광공사 시군구 코드를 자동 매칭하지 못했습니다.<br><small>${esc(v.address||v.union||'주소 없음')}</small></div>`));bindAnalysis();return}setRight(rightShell(v,`${analysisNav()}<div class="loading">${esc(a.areaNm)} ${esc(a.signguNm)} 관광분석을 불러오는 중...</div>`));bindAnalysis();const base=`areaCd=${a.areaCd}&signguCd=${a.signguCd}`;try{let body='';if(tab==='demand'){const r1=await firstNonEmpty(ym=>`/api/kto/areaResourceDemand/areaTarSvcDemList?baseYm=${ym}&${base}&tarSvcDemIxCd=1112`);const r2=await firstNonEmpty(ym=>`/api/kto/areaResourceDemand/areaCulResDemList?baseYm=${ym}&${base}&culResDemIxCd=1201`);const x=r1.arr[0]||{},y=r2.arr[0]||{};body=cards([[x.tarSvcDemIxNm,x.tarSvcDemIxVal],[y.culResDemIxNm,y.culResDemIxVal]],`기준연월 ${r1.ym||r2.ym||'—'}`)}else if(tab==='diversity'){const rs=await Promise.all([firstNonEmpty(ym=>`/api/kto/areaDiversity/areaTouDivList?baseYm=${ym}&${base}&touDivIxCd=3101`),firstNonEmpty(ym=>`/api/kto/areaDiversity/areaExpDivList?baseYm=${ym}&${base}&expDivIxCd=3204`),firstNonEmpty(ym=>`/api/kto/areaDiversity/areaIntlDivList?baseYm=${ym}&${base}&intlDivIxCd=3303`)]);body=cards([[rs[0].arr[0]?.touDivIxNm,rs[0].arr[0]?.touDivIxVal],[rs[1].arr[0]?.expDivIxNm,rs[1].arr[0]?.expDivIxVal],[rs[2].arr[0]?.intlDivIxNm,rs[2].arr[0]?.intlDivIxVal]],'관광 다양성 지표') }else if(tab==='strength'){const rs=await Promise.all([firstNonEmpty(ym=>`/api/kto/areaDemandStrength/areaTarSjrnDsList?baseYm=${ym}&${base}&tarSjrnDsIxCd=2101`),firstNonEmpty(ym=>`/api/kto/areaDemandStrength/areaTarExpDsList?baseYm=${ym}&${base}&tarExpDsIxCd=2201`)]);body=cards([[rs[0].arr[0]?.tarSjrnDsIxNm,rs[0].arr[0]?.tarSjrnDsIxVal],[rs[1].arr[0]?.tarExpDsIxNm,rs[1].arr[0]?.tarExpDsIxVal]],'관광수요 강도 지표')}else if(tab==='hub'){const r=await firstNonEmpty(ym=>`/api/kto/localHub/areaBasedList1?baseYm=${ym}&${base}`);body=rankList(r.arr,'hubTatsNm','hubRank','중심 관광지')}else if(tab==='related'){const r=await firstNonEmpty(ym=>`/api/kto/relatedTour/areaBasedList1?baseYm=${ym}&${base}`);body=rankList(r.arr,'rlteTatsNm','rlteRank','연관 관광지')}else if(tab==='forecast'){let target=(S.selectedTour?.contentTypeId==='12')?S.selectedTour.title:null;if(!target){const j=await getJSON(`/api/tour/nearby?mapX=${v.lng}&mapY=${v.lat}&radius=${Number($('#radius').value||3000)}&numOfRows=10&contentTypeId=12`);target=j.items?.[0]?.title;S.selectedTour=j.items?.[0]||null}if(!target)body='<div class="empty">집중률 예측 대상 관광지를 찾지 못했습니다.</div>';else{const j=await getJSON(`/api/kto/concentration/tatsCnctrRatedList?${base}&tAtsNm=${encodeURIComponent(target)}`);let arr=j.body?.items?.item||[];if(!Array.isArray(arr))arr=arr?[arr]:[];body=`<div class="section"><h3>${esc(target)} 관광객 집중률 예측</h3>${arr.slice(0,30).map((x,i)=>`<div class="rank"><i>${i+1}</i><span>${esc(x.baseYmd||'')}</span><b>${esc(x.cnctrRate||'—')}</b></div>`).join('')||'<div class="empty">예측 데이터가 없습니다.</div>'}</div>`}}setRight(rightShell(v,`${analysisNav()}<div class="note">분석단위: ${esc(a.areaNm)} ${esc(a.signguNm)} · 어촌계 자체 지표와 구분하여 표시합니다.</div>${body}`));bindAnalysis()}catch(e){setRight(rightShell(v,`${analysisNav()}<div class="empty">분석 API 오류<br><small>${esc(e.message)}</small></div>`));bindAnalysis()}}
+function cards(rows,sub){return `<div class="section"><h3>관광분석 지표</h3>${rows.map(([n,v])=>`<div class="analysis-card"><b>${esc(n||'지표')}</b><strong>${esc(v??'—')}</strong><small>${esc(sub)}</small></div>`).join('')}</div>`}
+function rankList(arr,nameKey,rankKey,title){const seen=new Set(),list=[];for(const x of arr){const n=x[nameKey];if(!n||seen.has(n))continue;seen.add(n);list.push(x)}list.sort((a,b)=>Number(a[rankKey]||999)-Number(b[rankKey]||999));return `<div class="section"><h3>${title}</h3>${list.slice(0,15).map((x,i)=>`<div class="rank"><i>${esc(x[rankKey]||i+1)}</i><span>${esc(x[nameKey])}</span><small>${esc(x.rlteCtgryMclsNm||x.hubCtgryMclsNm||'')}</small></div>`).join('')||'<div class="empty">데이터가 없습니다.</div>'}</div>`}
+function bindAnalysis(){$$('[data-analysis]').forEach(b=>b.onclick=()=>loadAnalysis(b.dataset.analysis))}
+function selectVillage(v){if(!v)return;S.selected=v;S.area=resolveArea(v);S.map.setView([v.lat,v.lng],Math.max(S.map.getZoom(),13));renderVillageList();setMode(S.mode,true);openSheet()}
+function setMode(mode,force=false){
+  S.mode=mode;
+  $$('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  if(mode==='village'){
+    S.dataLayer.clearLayers();renderVillageList();drawVillages();
+    if(S.selected){renderBasic();openSheet()}else{closeSheet()}
+    return;
+  }
+  if(!S.selected){renderVillageList();showVillageSheet();return}
+  if(mode==='analysis'){renderVillageList();drawVillages();loadAnalysis();openSheet();return}
+  loadMode(mode);openSheet();
+}
+const SEARCH_THEMES=[
+  {group:'기능',mode:'village',icon:'🗺',key:'어촌계 지도',label:'어촌계',desc:'전국 어촌계 지도와 목록'},
+  {group:'기능',mode:'tour',icon:'📍',key:'주변관광 관광지 명소',label:'주변관광',desc:'선택 어촌 주변 관광지'},
+  {group:'기능',mode:'food',icon:'🍽',key:'먹거리 음식점 맛집 식당',label:'먹거리',desc:'주변 음식점·맛집'},
+  {group:'기능',mode:'stay',icon:'🛏',key:'숙박 숙소 호텔 펜션 민박',label:'숙박',desc:'주변 숙박시설'},
+  {group:'기능',mode:'experience',icon:'🎣',key:'체험 레포츠 낚시',label:'체험',desc:'체험·레포츠'},
+  {group:'기능',mode:'pet',icon:'🐾',key:'반려동물 펫여행 동반여행',label:'반려동물',desc:'반려동물 동반 여행'},
+  {group:'기능',mode:'analysis',icon:'📊',key:'관광분석',label:'관광분석',desc:'관광수요·다양성·강도·예측'},
+
+  {group:'분석',mode:'analysis',analysisTab:'demand',icon:'📈',key:'관광자원 수요 관광수요',label:'관광자원 수요',desc:'관광서비스·문화자원 수요'},
+  {group:'분석',mode:'analysis',analysisTab:'diversity',icon:'◉',key:'관광 다양성 다양성',label:'관광 다양성',desc:'관광객·소비·국제적 다양성'},
+  {group:'분석',mode:'analysis',analysisTab:'strength',icon:'⚡',key:'관광수요 강도 수요강도',label:'관광수요 강도',desc:'체류·소비 강도'},
+  {group:'분석',mode:'analysis',analysisTab:'hub',icon:'◎',key:'중심관광지 허브',label:'중심관광지',desc:'기초지자체 중심 관광지'},
+  {group:'분석',mode:'analysis',analysisTab:'related',icon:'↔',key:'연관관광지 관련관광지',label:'연관관광지',desc:'함께 방문하는 연관 관광지'},
+  {group:'분석',mode:'analysis',analysisTab:'forecast',icon:'▥',key:'집중률 예측 방문자 추이 혼잡',label:'집중률 예측',desc:'관광객 집중률·방문 추이 예측'}
+];
+
+const INITIALS=['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ','기타'];
+let SEARCH_INITIAL='전체';
+
+function normalizeSearch(s){
+  return String(s||'')
+    .toLowerCase()
+    .replace(/어촌계/g,'')
+    .replace(/[\s·._\-\/]/g,'');
+}
+function villageSearchText(v){
+  return normalizeSearch(`${v.name||''} ${v.aliases||''} ${v.address||''} ${v.union||''} ${v.region||''} ${v.products||''}`);
+}
+function getInitial(name){
+  const s=String(name||'').trim();
+  if(!s)return '기타';
+  const code=s.charCodeAt(0);
+  if(code>=0xAC00&&code<=0xD7A3){
+    const lead=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'][Math.floor((code-0xAC00)/588)];
+    return {'ㄲ':'ㄱ','ㄸ':'ㄷ','ㅃ':'ㅂ','ㅆ':'ㅅ','ㅉ':'ㅈ'}[lead]||lead;
+  }
+  return '기타';
+}
+function currentRegionVillages(){
+  const r=$('#region')?.value||'전체';
+  return S.all.filter(v=>r==='전체'||v.region===r);
+}
+function matchingThemes(q=''){
+  const t=normalizeSearch(q);
+  if(!t)return SEARCH_THEMES;
+  return SEARCH_THEMES.filter(x=>normalizeSearch(`${x.key} ${x.label} ${x.desc}`).includes(t));
+}
+function matchingVillages(q=''){
+  const t=normalizeSearch(q);
+  let rows=currentRegionVillages();
+  if(t)rows=rows.filter(v=>villageSearchText(v).includes(t));
+  if(!t && SEARCH_INITIAL!=='전체')rows=rows.filter(v=>getInitial(v.name)===SEARCH_INITIAL);
+
+  rows.sort((a,b)=>{
+    if(t){
+      const an=normalizeSearch(a.name),bn=normalizeSearch(b.name);
+      const ae=an===t?0:an.startsWith(t)?1:2;
+      const be=bn===t?0:bn.startsWith(t)?1:2;
+      if(ae!==be)return ae-be;
+    }
+    return String(a.name).localeCompare(String(b.name),'ko');
+  });
+  return rows;
+}
+function closeSearchSuggest(){
+  $('#searchSuggest')?.classList.remove('open');
+  $('#searchBtn')?.classList.remove('open');
+}
+function chooseSearchTheme(theme){
+  if(!theme)return;
+  $('#search').value=theme.label;
+  closeSearchSuggest();
+  if(theme.analysisTab)S.analysisTab=theme.analysisTab;
+  if(theme.mode==='village'){
+    setMode('village',true);
+    showVillageSheet();
+    return;
+  }
+  setMode(theme.mode,true);
+}
+function initialsBar(rows){
+  const counts={};
+  for(const x of INITIALS)counts[x]=0;
+  for(const v of currentRegionVillages())counts[getInitial(v.name)] = (counts[getInitial(v.name)]||0)+1;
+
+  const btns=[
+    `<button type="button" data-initial="전체" class="${SEARCH_INITIAL==='전체'?'active':''}">전체</button>`,
+    ...INITIALS.filter(x=>counts[x]>0).map(x=>
+      `<button type="button" data-initial="${x}" class="${SEARCH_INITIAL===x?'active':''}">${x} ${fmt(counts[x])}</button>`
+    )
+  ];
+  return `<div class="suggest-initials">${btns.join('')}</div>`;
+}
+function villageRowsHtml(rows){
+  return rows.map(v=>`
+    <button type="button" class="suggest-row village-row" data-suggest-village="${v.id}">
+      <span class="suggest-main">
+        <b>${esc(v.name)}어촌계</b>
+        <small>${esc(v.address||v.union||v.region||'')}</small>
+      </span>
+      <span class="suggest-tag">${esc(v.region||'어촌계')}</span>
+    </button>
+  `).join('');
+}
+function groupedVillageHtml(rows,q=''){
+  const t=normalizeSearch(q);
+
+  // 검색어가 있으면 초성 필터 없이 전체 매칭 결과 표시
+  if(t){
+    return `<div class="suggest-head">어촌계 이름 · ${fmt(rows.length)}개</div>`+
+           `<div class="suggest-village-list">${villageRowsHtml(rows)}</div>`;
+  }
+
+  // 빈 검색창: 초성 버튼 + 전체 2,045개 그룹 표시
+  let out=`<div class="suggest-head">어촌계 전체 · ${fmt(currentRegionVillages().length)}개</div>`;
+  out+=initialsBar(rows);
+
+  if(SEARCH_INITIAL!=='전체'){
+    out+=`<div class="suggest-letter">${SEARCH_INITIAL} · ${fmt(rows.length)}개</div>`;
+    out+=`<div class="suggest-village-list">${villageRowsHtml(rows)}</div>`;
+    return out;
+  }
+
+  // 전체 선택 시 ㄱ~ㅎ 그룹별로 2,045개 모두 표시
+  const groups=new Map(INITIALS.map(x=>[x,[]]));
+  for(const v of rows){
+    const k=getInitial(v.name);
+    if(!groups.has(k))groups.set(k,[]);
+    groups.get(k).push(v);
+  }
+  for(const x of INITIALS){
+    const arr=groups.get(x)||[];
+    if(!arr.length)continue;
+    out+=`<div class="suggest-letter">${x} · ${fmt(arr.length)}개</div>`;
+    out+=`<div class="suggest-village-list">${villageRowsHtml(arr)}</div>`;
+  }
+  return out;
+}
+function renderSearchSuggest(){
+  const box=$('#searchSuggest');
+  if(!box)return;
+
+  const q=$('#search').value||'';
+  const themes=matchingThemes(q);
+  const villages=matchingVillages(q);
+
+  let out='';
+
+  if(themes.length){
+    out += `<div class="suggest-head">기능</div>`;
+    out += themes.map(x=>{
+      const idx=SEARCH_THEMES.indexOf(x);
+      return `
+        <button type="button" class="suggest-row theme" data-theme-index="${idx}">
+          <span class="suggest-icon">${x.icon}</span>
+          <span class="suggest-main">
+            <b>${esc(x.label)}</b>
+            <small>${esc(x.desc)}</small>
+          </span>
+          <span class="suggest-tag">${x.group==='분석'?'분석':'기능'}</span>
+        </button>`;
+    }).join('');
+  }
+
+  out += groupedVillageHtml(villages,q);
+
+  if(!out)out='<div class="suggest-empty">검색 결과가 없습니다.</div>';
+
+  box.innerHTML=out;
+  box.classList.add('open');
+  $('#searchBtn')?.classList.add('open');
+}
+function handleSearchSuggestClick(e){
+  const initialBtn=e.target.closest('[data-initial]');
+  if(initialBtn){
+    e.preventDefault();
+    e.stopPropagation();
+    SEARCH_INITIAL=initialBtn.dataset.initial;
+    renderSearchSuggest();
+    return;
+  }
+
+  const themeBtn=e.target.closest('[data-theme-index]');
+  if(themeBtn){
+    e.preventDefault();
+    e.stopPropagation();
+    chooseSearchTheme(SEARCH_THEMES[Number(themeBtn.dataset.themeIndex)]);
+    return;
+  }
+
+  const villageBtn=e.target.closest('[data-suggest-village]');
+  if(villageBtn){
+    e.preventDefault();
+    e.stopPropagation();
+    const v=S.all.find(x=>x.id===villageBtn.dataset.suggestVillage);
+    if(v){
+      $('#search').value=`${v.name}어촌계`;
+      SEARCH_INITIAL='전체';
+      closeSearchSuggest();
+      selectVillage(v);
+    }
+  }
+}
+function searchGlobal(){
+  const q=$('#search').value||'';
+  const villages=matchingVillages(q);
+  const themes=matchingThemes(q);
+
+  if(normalizeSearch(q) && villages.length){
+    $('#search').value=`${villages[0].name}어촌계`;
+    SEARCH_INITIAL='전체';
+    closeSearchSuggest();
+    selectVillage(villages[0]);
+    return;
+  }
+  if(themes.length){
+    chooseSearchTheme(themes[0]);
+    return;
+  }
+  renderSearchSuggest();
+}
+function init(){
+  if(!Array.isArray(S.all)||!S.all.length){
+    $('#mapCount').textContent='어촌계 데이터 로드 오류';
+    $('#sheetContent').innerHTML='<div class="empty">villages.js 데이터를 불러오지 못했습니다. 파일 경로와 브라우저 캐시를 확인하십시오.</div>';
+    openSheet();
+    return;
+  }
+  regionOptions();renderVillageList();
+  S.map=L.map('map',{zoomControl:true,preferCanvas:true,maxZoom:CLUSTER_MAX_ZOOM}).setView([36.2,127.8],7);
+
+  // 기본지도: OpenFreeMap 우선, 로드 문제가 있으면 OSM raster로 대체
+  let baseLoaded=false;
+  try{
+    if(typeof L.maplibreGL==='function'){
+      const gl=L.maplibreGL({style:'https://tiles.openfreemap.org/styles/liberty'}).addTo(S.map);
+      const glMap=gl.getMaplibreMap?.();
+      if(glMap){
+        glMap.once('load',()=>{baseLoaded=true});
+        glMap.on('error',()=>{
+          if(!baseLoaded && !S._fallbackBase){
+            S._fallbackBase=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+              maxZoom:19,
+              attribution:'&copy; OpenStreetMap contributors'
+            }).addTo(S.map);
+          }
+        });
+      }else{
+        baseLoaded=true;
+      }
+    }else{
+      throw new Error('MapLibre layer unavailable');
+    }
+  }catch(e){
+    S._fallbackBase=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:19,
+      attribution:'&copy; OpenStreetMap contributors'
+    }).addTo(S.map);
+  }
+
+  S.vLayer=L.layerGroup().addTo(S.map);
+  S.dataLayer=L.layerGroup().addTo(S.map);
+  S.spiderLayer=L.layerGroup().addTo(S.map);
+
+  requestAnimationFrame(()=>S.map.invalidateSize(true));
+  setTimeout(()=>S.map.invalidateSize(true),180);
+
+  drawVillages();
+  const b=L.latLngBounds(S.all.map(v=>[v.lat,v.lng]));
+  S.map.fitBounds(b,{padding:[20,20],maxZoom:7});
+  S.map.on('zoomend',drawVillages);
+  S.map.on('moveend',()=>{S.spiderLayer?.clearLayers();if(S.map.getZoom()<=5)drawVillages()});
+  S.map.on('click',()=>{if(!$('#mobileSheet').classList.contains('full')) closeSheet()});
+  emptyRight();closeSheet();
+}
+$('#region').addEventListener('change',()=>setRegion($('#region').value));
+$('#radius').addEventListener('change',()=>{if(S.selected&&S.mode!=='village'&&S.mode!=='analysis')loadMode(S.mode)});
+$('#resetBtn').onclick=()=>{SEARCH_INITIAL='전체';$('#radius').value='3000';$('#search').value='';setRegion('전체');closeSearchSuggest();closeSheet()};
+$('#searchBtn').onclick=e=>{
+  e.preventDefault();e.stopPropagation();
+  if($('#searchSuggest').classList.contains('open'))closeSearchSuggest();
+  else renderSearchSuggest();
+};
+$('#search').addEventListener('input',()=>{SEARCH_INITIAL='전체';renderSearchSuggest()});
+$('#search').addEventListener('focus',renderSearchSuggest);
+$('#search').addEventListener('mouseenter',renderSearchSuggest);
+$('#search').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();searchGlobal()}
+  if(e.key==='Escape')closeSearchSuggest();
+});
+$('#searchSuggest').addEventListener('click',handleSearchSuggestClick);
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#globalSearchBox'))closeSearchSuggest();
+});
+$$('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$$('[data-layer]').forEach(c=>c.addEventListener('change',()=>{
+  if(c.dataset.layer==='village'){c.checked?S.map.addLayer(S.vLayer):S.map.removeLayer(S.vLayer)}
+  else if(c.checked&&S.selected)setMode(c.dataset.layer);
+  else if(!c.checked)S.dataLayer.clearLayers()
+}));
+$('#layerBtn').onclick=()=>$('#mapToolbar').classList.toggle('open');
+$('#sheetClose').onclick=closeSheet;
+$('#sheetExpand').onclick=toggleSheetFull;
+$('#menuBtn').onclick=showMenuSheet;
+$$('[data-nav]').forEach(b=>b.onclick=()=>{
+  $$('[data-nav]').forEach(x=>x.classList.toggle('active',x===b));
+  const n=b.dataset.nav;
+  if(n==='map'){closeSheet();setMode('village')}
+  else if(n==='list'){showVillageSheet()}
+  else if(n==='nearby'){if(S.selected)setMode('tour',true);else showVillageSheet()}
+  else if(n==='analysis'){if(S.selected)setMode('analysis',true);else showVillageSheet()}
+  else if(n==='menu'){showMenuSheet()}
+});
+$('#locBtn')?.addEventListener('click',()=>{
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(p=>S.map.setView([p.coords.latitude,p.coords.longitude],13),()=>{});
+});
+init();
+if(location.protocol!=='file:'&&'serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body></html>

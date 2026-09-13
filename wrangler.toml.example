@@ -1,0 +1,8 @@
+name = "kafv-fishing-village-tourism-api"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# 배포 전: npx wrangler secret put KTO_API_KEY
+# 선택: ALLOWED_ORIGINS = "https://<github-user>.github.io,https://<custom-domain>"
+[vars]
+ALLOWED_ORIGINS = ""
