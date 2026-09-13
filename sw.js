@@ -1,5 +1,5 @@
-const CACHE='kafv-fishing-village-tourism-pwa-intro-concentration-v2';
-const ASSETS=["./", "./index.html", "./villages.js", "./config.js", "./kto-area-codes.js", "./manifest.json", "./icon-192.png", "./icon-512.png", "./assets/fallback-village.svg", "./assets/fallback-tour.svg", "./assets/fallback-food.svg", "./assets/fallback-stay.svg", "./assets/fallback-experience.svg", "./assets/fallback-pet.svg", "./assets/splash.png", "./assets/main-cover.png"];
+const CACHE='kafv-fishing-village-tourism-pwa-icon-v2';
+const ASSETS=["./", "./index.html", "./villages.js", "./config.js", "./kto-area-codes.js", "./manifest.json", "./icon-192-v2.png", "./icon-512-v2.png", "./assets/fallback-village.svg", "./assets/fallback-tour.svg", "./assets/fallback-food.svg", "./assets/fallback-stay.svg", "./assets/fallback-experience.svg", "./assets/fallback-pet.svg", "./assets/splash.png", "./assets/main-cover.png"];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.origin!==location.origin)return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{const cp=resp.clone();caches.open(CACHE).then(c=>c.put(e.request,cp));return resp})))});
